@@ -1,39 +1,9 @@
-﻿module Compilation
+﻿module Normalization
 
 open System
 open IR
+open Common
 open System.Collections.Generic
-
-type Ref = 
-    { idx : int
-      tpe : Type.Type }
-
-type Val = 
-    | Arg of Ref
-    | Loc of Ref
-
-type Def = 
-    { id : string
-      ret : Type.Type
-      args : Type.Type list }
-
-type Var = 
-    | Def of Def
-    | Val of Val
-
-type FunContext = 
-    { args : Ref list
-      locals : Ref list }
-
-type ScopeContext = 
-    { vals : Map<string, Val>
-      defs : Map<string, Def> }
-
-type Env = 
-    { scopes : Stack<ScopeContext>
-      fn : Stack<FunContext> }
-
-exception CompilationError of string
 
 //TODO implement type unifying rules
 let rec uni ir tpe target = 
@@ -104,6 +74,11 @@ let rec run (env : Env) e =
             | Ast.Mul -> Mul
             | Ast.Div -> Div
             | Ast.Eq -> Eq
+            | Ast.Mod -> failwith "Not implemented yet"
+            | Ast.Le -> failwith "Not implemented yet"
+            | Ast.Ge -> failwith "Not implemented yet"
+            | Ast.Greater -> failwith "Not implemented yet"
+            | Ast.Less -> failwith "Not implemented yet"
         
         let cl = uni lir lt rt
         BinOp(cl, irOp, rir), rt
@@ -206,5 +181,3 @@ let normalize ast =
     run { scopes = scopes
           fn = fns } ast
     |> fst
-
-
