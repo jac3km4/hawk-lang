@@ -1,0 +1,124 @@
+﻿%{
+open Ast
+#indent "off"
+%}
+
+%start start
+
+%token TRUE
+%token FALSE
+%token DEF
+%token VAL
+%token WHILE
+%token IF
+%token ELSE
+%token BREAK
+%token RETURN
+%token LPAREN
+%token RPAREN
+%token LBRACE
+%token RBRACE
+%token COMMA
+%token SEMICOLON
+%token COLON
+%token ASSIGN
+%token ADD
+%token SUB
+%token DIV
+%token MUL
+%token MOD
+%token BANG
+%token EQ
+%token GE
+%token LE
+%token GREATER
+%token LESS
+%token T_INT
+%token T_FLOAT
+%token T_STRING
+%token T_BOOL
+%token T_UNIT
+%token <string> ID
+%token <int> INT
+%token <float> FLOAT
+%token EOF
+
+%right ASSIGN SEMICOLON IF
+%left COMMA EQ LE LESS GREATER GE SUB ADD
+%left MUL DIV
+
+%type <Expr> start
+
+%%
+
+start: prog EOF { $1 }
+
+prog:
+	| expr { $1 }
+
+expr:
+	| ID { Var $1 }
+	| literal { Literal $1 }
+	| LBRACE expr_block RBRACE { Block $2 }
+	| LPAREN expr RPAREN { $2 }
+	| expr binop expr { BinOp($1, $2, $3) }
+	| unop expr %prec MUL { UnOp($1, $2) }
+	| IF LPAREN expr RPAREN expr else_block { IfBranch($3, $5, $6) }
+	| VAL ID opt_type ASSIGN expr { Val($2, $3, $5) }
+	| VAL LPAREN args RPAREN ASSIGN expr { ValTuple($3, $6) }
+	| DEF ID opt_args opt_type ASSIGN expr { Def($2, $4, $3, $6) }
+	| expr LPAREN expr_list RPAREN %prec MUL { Apply($1, $3) }
+
+else_block:
+	| ELSE expr { Some $2 }
+	| { None }
+
+expr_block:
+	| expr expr_block { $1 :: $2 }
+	| expr { [$1] }
+
+expr_list:
+	| expr COMMA expr_list { $1 :: $3 }
+	| expr { [$1] }
+
+opt_type:
+	| COLON type_spec { Some $2 }
+	| { None }
+
+opt_args:
+	| LPAREN args RPAREN { $2 }
+	| { [] }
+
+args:
+	| ID opt_type COMMA args { ($1, $2) :: $4 }
+	| ID opt_type { [($1, $2)] }
+
+unop:
+	| SUB { Neg }
+	| BANG { Not }
+
+binop:
+	| ADD { Add }
+	| SUB { Sub }
+	| MUL { Mul }
+	| DIV { Div }
+	| MOD { Mod }
+	| EQ { Eq }
+	| GE { Ge }
+	| LE { Le }
+	| GREATER { Greater }
+	| LESS { Less }
+
+literal:
+	| INT { Int $1 }
+	| FLOAT { Float $1 }
+	| TRUE { Bool true }
+	| FALSE { Bool false }
+	| LPAREN RPAREN { Unit }
+
+type_spec:
+	| T_INT { Type.Int }
+	| T_FLOAT { Type.Float }
+	| T_STRING { Type.String }
+	| T_BOOL { Type.Bool }
+	| T_UNIT { Type.Unit }

@@ -1,0 +1,59 @@
+﻿{
+
+module Lexer
+
+open Microsoft.FSharp.Text.Lexing
+open System
+open Parser
+
+let lexeme = LexBuffer.LexemeString
+
+let newline (lexbuf: LexBuffer<_>) = 
+  lexbuf.StartPos <- lexbuf.StartPos.NextLine
+}
+
+let digit = ['0'-'9']
+let whitespace = [' ' '\t' ]
+let newline = ('\n' | '\r' '\n')
+let lower = ['a'-'z']
+let upper = ['A'-'Z']
+
+rule token = parse
+	| whitespace { token lexbuf }
+	| newline { newline lexbuf; token lexbuf }
+	| "("	{ LPAREN }
+	| ")"	{ RPAREN }
+	| "{"	{ LBRACE }
+	| "}"	{ RBRACE }
+	| ","	{ COMMA }
+	| ";"	{ SEMICOLON }
+	| "!"	{ BANG }
+	| "=="	{ EQ }
+	| ">="	{ GE }
+	| "<="	{ LE }
+	| ">"	{ GREATER }
+	| "<"	{ LESS }
+	| "="	{ ASSIGN }
+	| "+"	{ ADD }
+	| "-"	{ SUB }
+	| "*"	{ MUL }
+	| "/"	{ DIV }
+	| ":"	{ COLON }
+	| "%"	{ MOD }
+	| "def"	{ DEF }
+	| "val"	{ VAL }
+	| "true"	{ TRUE }
+	| "false"	{ FALSE }
+	| "if"	{ IF }
+	| "else"	{ ELSE }
+	| "while"	{ WHILE }
+	| "return"	{ RETURN }
+	| "Int"	{ T_INT }
+	| "Float"	{ T_FLOAT }
+	| "String"	{ T_STRING }
+	| "Bool"	{ T_BOOL }
+	| "Unit"	{ T_UNIT }
+	| (lower|upper|'_')(digit|lower|upper|'_')*	{ ID (lexeme lexbuf) }
+	| ['-']?digit+	{ INT (int (lexeme lexbuf)) }
+	| ['-']?digit+('.'digit+)?(['e''E']digit+)?	{ FLOAT (float (lexeme lexbuf)) }
+	| eof { EOF }
