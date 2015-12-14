@@ -41,6 +41,7 @@ open Ast
 %token <string> ID
 %token <int> INT
 %token <float> FLOAT
+%token <string> STRING
 %token EOF
 
 %right ASSIGN SEMICOLON IF
@@ -61,7 +62,7 @@ expr:
 	| literal { Literal $1 }
 	| LBRACE expr_block RBRACE { Block $2 }
 	| LPAREN expr RPAREN { $2 }
-	| expr binop expr { BinOp($1, $2, $3) }
+	| expr binop expr %prec ADD { BinOp($1, $2, $3) }
 	| unop expr %prec MUL { UnOp($1, $2) }
 	| IF LPAREN expr RPAREN expr else_block { IfBranch($3, $5, $6) }
 	| VAL ID opt_type ASSIGN expr { Val($2, $3, $5) }
@@ -114,6 +115,7 @@ literal:
 	| FLOAT { Float $1 }
 	| TRUE { Bool true }
 	| FALSE { Bool false }
+	| STRING { String $1 }
 	| LPAREN RPAREN { Unit }
 
 type_spec:

@@ -4,6 +4,19 @@ open System.Collections.Generic
 
 exception CompilationError of string
 
+let astOpToIR = 
+    function 
+    | Ast.Add -> IR.Add
+    | Ast.Sub -> IR.Sub
+    | Ast.Mul -> IR.Mul
+    | Ast.Div -> IR.Div
+    | Ast.Mod -> IR.Mod
+    | Ast.Eq -> IR.Eq
+    | Ast.Ge -> IR.Ge
+    | Ast.Le -> IR.Le
+    | Ast.Greater -> IR.Greater
+    | Ast.Less -> IR.Less
+
 type Ref = 
     { idx : int
       tpe : Type.Type }

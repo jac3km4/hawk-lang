@@ -7,11 +7,13 @@ open System.Collections.Generic
 
 //TODO implement type unifying rules
 let rec uni ir tpe target = 
-    match (target, tpe) with
-    | (Type.Int, Type.Int) | (Type.Float, Type.Float) | (Type.Bool, Type.Bool) | (Type.Bool, Type.Int) | (Type.Int, 
-                                                                                                          Type.Bool) -> 
+    match (tpe, target) with
+    | (Type.Int, Type.Int) | (Type.Float, Type.Float) | (Type.Bool, Type.Bool)
+    | (Type.Bool, Type.Int) | (Type.Int, Type.Bool) | (Type.String, Type.String) -> 
         ir
-    | _ -> failwith "Not implemented yet"
+    | (Type.Int, Type.Float) -> Conv(ir, Type.Float)
+    | (Type.Float, Type.Int) -> Conv(ir, Type.Int)
+    | _ -> raise (CompilationError(sprintf "Incompatible types: %A and %A" target tpe))
 
 let rec run (env : Env) e = 
     match e with
@@ -66,22 +68,23 @@ let rec run (env : Env) e =
         //TODO implement binary ops properly...
         let (lir, lt) = run env le
         let (rir, rt) = run env re
-        
-        let irOp = 
+        let crir = uni rir rt lt
+        match lt with
+        | Type.Int | Type.Float -> 
+            let rest = 
+                match op with
+                | Ast.Add | Ast.Sub | Ast.Mul | Ast.Div | Ast.Mod -> lt
+                | Ast.Eq | Ast.Ge | Ast.Le | Ast.Greater | Ast.Less -> Type.Bool
+            BinOp(lir, Common.astOpToIR op, crir), rest
+        | Type.String -> 
             match op with
-            | Ast.Add -> Add
-            | Ast.Sub -> Sub
-            | Ast.Mul -> Mul
-            | Ast.Div -> Div
-            | Ast.Eq -> Eq
-            | Ast.Mod -> failwith "Not implemented yet"
-            | Ast.Le -> failwith "Not implemented yet"
-            | Ast.Ge -> failwith "Not implemented yet"
-            | Ast.Greater -> failwith "Not implemented yet"
-            | Ast.Less -> failwith "Not implemented yet"
-        
-        let cl = uni lir lt rt
-        BinOp(cl, irOp, rir), rt
+            | Ast.Add -> BinOp(lir, StringConcat, crir), Type.String
+            | Ast.Eq -> BinOp(lir, StringEqual, crir), Type.Bool
+            | _ -> raise (CompilationError(sprintf "Cannot use %A operator on String" op))
+        | Type.Bool -> 
+            match op with
+            | Ast.Eq -> BinOp(lir, Eq, crir), Type.Bool
+            | _ -> raise (CompilationError(sprintf "Cannot use %A operator on Bool" op))
     | Ast.IfBranch(cond, ifBranch, elseBranch) -> 
         let (condIr, condType) = run env cond
         let cCondIr = uni condIr condType Type.Bool

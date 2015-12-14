@@ -40,17 +40,37 @@ let rec codegen (tpe : TypeBuilder) (funs : Dictionary<string, MethodInfo>) (gen
         | IConst i -> gen.Emit(OpCodes.Ldc_I4, i)
         | FConst f -> gen.Emit(OpCodes.Ldc_R4, f)
         | SConst s -> gen.Emit(OpCodes.Ldstr, s)
+    | UnOp(op, ir) -> 
+        codegen tpe funs gen ir
+        match op with
+        | Neg -> gen.Emit(OpCodes.Neg)
+        | Not -> gen.Emit(OpCodes.Not)
     | BinOp(l, op, r) -> 
         codegen tpe funs gen l
         codegen tpe funs gen r
-        let opcode = 
-            match op with
-            | Add -> OpCodes.Add
-            | Sub -> OpCodes.Sub
-            | Mul -> OpCodes.Mul
-            | Div -> OpCodes.Div
-            | Eq -> OpCodes.Ceq
-        gen.Emit(opcode)
+        match op with
+        | Add -> gen.Emit(OpCodes.Add)
+        | Sub -> gen.Emit(OpCodes.Sub)
+        | Mul -> gen.Emit(OpCodes.Mul)
+        | Div -> gen.Emit(OpCodes.Div)
+        | Eq -> gen.Emit(OpCodes.Ceq)
+        | Mod -> failwith "Not implemented yet"
+        | Ge -> failwith "Not implemented yet"
+        | Le -> failwith "Not implemented yet"
+        | Greater -> gen.Emit(OpCodes.Cgt)
+        | Less -> gen.Emit(OpCodes.Clt)
+        | StringConcat -> 
+            let concat = 
+                typedefof<String>.GetMethod("Concat", 
+                                            [| typedefof<string>
+                                               typedefof<string> |])
+            gen.Emit(OpCodes.Call, concat)
+        | StringEqual -> 
+            let equals = 
+                typedefof<String>.GetMethod("Equals", 
+                                            [| typedefof<string>
+                                               typedefof<string> |])
+            gen.Emit(OpCodes.Call, equals)
     | BranchTrueFalse(l, r, ifB, elseB) -> 
         codegen tpe funs gen l
         codegen tpe funs gen r
@@ -66,6 +86,12 @@ let rec codegen (tpe : TypeBuilder) (funs : Dictionary<string, MethodInfo>) (gen
         codegen tpe funs gen elseB
         gen.MarkLabel(out)
     | Compound ops -> List.iter (codegen tpe funs gen) ops
+    | Conv(ir, target) -> 
+        codegen tpe funs gen ir
+        match target with
+        | Type.Float -> gen.Emit(OpCodes.Conv_R4)
+        | Type.Int -> gen.Emit(OpCodes.Conv_I4)
+        | _ -> failwith "Unexpected type"
     | Ret op -> 
         codegen tpe funs gen op
         gen.Emit(OpCodes.Ret)

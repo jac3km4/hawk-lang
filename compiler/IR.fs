@@ -12,7 +12,14 @@ type BinOp =
     | Sub
     | Mul
     | Div
+    | Mod
     | Eq
+    | Ge
+    | Le
+    | Greater
+    | Less
+    | StringConcat
+    | StringEqual
 
 type UnOp = 
     | Neg
@@ -33,4 +40,5 @@ type IR =
     | Compound of IR list
     | BranchTrueFalse of IR * IR * IR * IR
     | Branch of IR
+    | Conv of IR * Type.Type
     | Nop

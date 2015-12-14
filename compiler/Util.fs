@@ -7,3 +7,4 @@ let compile code name =
     |> Parser.start Lexer.token
     |> Normalization.normalize
     |> CodeGen.assembly name
+
