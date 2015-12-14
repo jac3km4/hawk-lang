@@ -17,85 +17,112 @@ let typeDefOf =
     | Type.Fun(_, _) -> failwith "Not implemented yet"
     | _ -> failwith "Unexpected type"
 
-let rec codegen (tpe : TypeBuilder) (funs : Dictionary<string, MethodInfo>) (gen : ILGenerator) ir : unit = 
+type Symbol = 
+    | Method of MethodInfo
+
+type Env = 
+    { tb : TypeBuilder
+      ilg : ILGenerator
+      symbols : Map<string, Symbol> }
+
+let rec codegen ({ tb = tb; ilg = ilg; symbols = sym } as env) ir : Env = 
     match ir with
     | Decfun(id, ret, args, body) -> 
         let fn = 
-            tpe.DefineMethod
+            tb.DefineMethod
                 (id, MethodAttributes.Public ||| MethodAttributes.Static, typeDefOf ret, 
                  Seq.map typeDefOf args |> Seq.toArray)
-        funs.Add(id, fn)
-        codegen tpe funs (fn.GetILGenerator()) body
+        let env = codegen { env with ilg = fn.GetILGenerator() } body
+        { env with symbols = Map.add id (Method fn) env.symbols }
     | Call(id, args) -> 
-        List.iter (codegen tpe funs gen) args
-        gen.EmitCall(OpCodes.Call, funs.Item id, null)
-    | Decloc(tpe) -> gen.DeclareLocal(typeDefOf tpe) |> ignore
-    | Stloc(idx, ops) -> 
-        codegen tpe funs gen ops
-        gen.Emit(OpCodes.Stloc, idx)
-    | Ldloc idx -> gen.Emit(OpCodes.Ldloc, idx)
-    | Ldarg idx -> gen.Emit(OpCodes.Ldarg, idx)
+        List.iter (fun arg -> codegen env arg |> ignore) args
+        let mi = 
+            match sym.Item id with
+            | Method m -> m
+            | _ -> failwith "Not found function"
+        ilg.EmitCall(OpCodes.Call, mi, null)
+        env
+    | Decloc(tpe) -> 
+        ilg.DeclareLocal(typeDefOf tpe) |> ignore
+        env
+    | Stloc(idx, ir) -> 
+        codegen env ir |> ignore
+        ilg.Emit(OpCodes.Stloc, idx)
+        env
+    | Ldloc idx -> 
+        ilg.Emit(OpCodes.Ldloc, idx)
+        env
+    | Ldarg idx -> 
+        ilg.Emit(OpCodes.Ldarg, idx)
+        env
     | Const c -> 
         match c with
-        | IConst i -> gen.Emit(OpCodes.Ldc_I4, i)
-        | FConst f -> gen.Emit(OpCodes.Ldc_R4, f)
-        | SConst s -> gen.Emit(OpCodes.Ldstr, s)
+        | IConst i -> ilg.Emit(OpCodes.Ldc_I4, i)
+        | FConst f -> ilg.Emit(OpCodes.Ldc_R4, f)
+        | SConst s -> ilg.Emit(OpCodes.Ldstr, s)
+        env
     | UnOp(op, ir) -> 
-        codegen tpe funs gen ir
+        codegen env ir |> ignore
         match op with
-        | Neg -> gen.Emit(OpCodes.Neg)
-        | Not -> gen.Emit(OpCodes.Not)
+        | Neg -> ilg.Emit(OpCodes.Neg)
+        | Not -> ilg.Emit(OpCodes.Not)
+        env
     | BinOp(l, op, r) -> 
-        codegen tpe funs gen l
-        codegen tpe funs gen r
+        codegen env l |> ignore
+        codegen env r |> ignore
         match op with
-        | Add -> gen.Emit(OpCodes.Add)
-        | Sub -> gen.Emit(OpCodes.Sub)
-        | Mul -> gen.Emit(OpCodes.Mul)
-        | Div -> gen.Emit(OpCodes.Div)
-        | Eq -> gen.Emit(OpCodes.Ceq)
+        | Add -> ilg.Emit(OpCodes.Add)
+        | Sub -> ilg.Emit(OpCodes.Sub)
+        | Mul -> ilg.Emit(OpCodes.Mul)
+        | Div -> ilg.Emit(OpCodes.Div)
+        | Eq -> ilg.Emit(OpCodes.Ceq)
         | Mod -> failwith "Not implemented yet"
         | Ge -> failwith "Not implemented yet"
         | Le -> failwith "Not implemented yet"
-        | Greater -> gen.Emit(OpCodes.Cgt)
-        | Less -> gen.Emit(OpCodes.Clt)
+        | Greater -> ilg.Emit(OpCodes.Cgt)
+        | Less -> ilg.Emit(OpCodes.Clt)
         | StringConcat -> 
             let concat = 
                 typedefof<String>.GetMethod("Concat", 
                                             [| typedefof<string>
                                                typedefof<string> |])
-            gen.Emit(OpCodes.Call, concat)
+            ilg.Emit(OpCodes.Call, concat)
         | StringEqual -> 
             let equals = 
                 typedefof<String>.GetMethod("Equals", 
                                             [| typedefof<string>
                                                typedefof<string> |])
-            gen.Emit(OpCodes.Call, equals)
+            ilg.Emit(OpCodes.Call, equals)
+        env
     | BranchTrueFalse(l, r, ifB, elseB) -> 
-        codegen tpe funs gen l
-        codegen tpe funs gen r
-        let ifL = gen.DefineLabel()
-        let elseL = gen.DefineLabel()
-        let out = gen.DefineLabel()
-        gen.Emit(OpCodes.Beq, ifL)
-        gen.Emit(OpCodes.Br, elseL)
-        gen.MarkLabel(ifL)
-        codegen tpe funs gen ifB
-        gen.Emit(OpCodes.Br, out)
-        gen.MarkLabel(elseL)
-        codegen tpe funs gen elseB
-        gen.MarkLabel(out)
-    | Compound ops -> List.iter (codegen tpe funs gen) ops
+        codegen env l |> ignore
+        codegen env r |> ignore
+        let ifL = ilg.DefineLabel()
+        let elseL = ilg.DefineLabel()
+        let out = ilg.DefineLabel()
+        ilg.Emit(OpCodes.Beq, ifL)
+        ilg.Emit(OpCodes.Br, elseL)
+        ilg.MarkLabel(ifL)
+        codegen env ifB |> ignore
+        ilg.Emit(OpCodes.Br, out)
+        ilg.MarkLabel(elseL)
+        codegen env elseB |> ignore
+        ilg.MarkLabel(out)
+        env
+    | Compound code -> List.fold (fun st ir -> codegen st ir) env code
     | Conv(ir, target) -> 
-        codegen tpe funs gen ir
+        //TODO this needs a fix
+        codegen env ir |> ignore
         match target with
-        | Type.Float -> gen.Emit(OpCodes.Conv_R4)
-        | Type.Int -> gen.Emit(OpCodes.Conv_I4)
+        | Type.Float -> ilg.Emit(OpCodes.Conv_R4)
+        | Type.Int -> ilg.Emit(OpCodes.Conv_I4)
         | _ -> failwith "Unexpected type"
-    | Ret op -> 
-        codegen tpe funs gen op
-        gen.Emit(OpCodes.Ret)
-    | _ -> ()
+        env
+    | Ret ir -> 
+        codegen env ir |> ignore
+        ilg.Emit(OpCodes.Ret)
+        env
+    | _ -> env
 
 let assembly name tree = 
     printfn "IR Tree:\n%A" tree
@@ -103,7 +130,10 @@ let assembly name tree =
     let mb = asm.DefineDynamicModule(name + ".exe")
     let prog = mb.DefineType(name, TypeAttributes.Class)
     let main = prog.DefineMethod("Main", MethodAttributes.Public ||| MethodAttributes.Static)
-    codegen prog (new Dictionary<string, MethodInfo>()) (main.GetILGenerator()) tree
+    codegen { tb = prog
+              ilg = main.GetILGenerator()
+              symbols = Map.empty } tree
+    |> ignore
     main.GetILGenerator().Emit OpCodes.Ret
     prog.CreateType() |> ignore
     asm.SetEntryPoint main

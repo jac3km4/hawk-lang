@@ -8,8 +8,9 @@ open System.Collections.Generic
 //TODO implement type unifying rules
 let rec uni ir tpe target = 
     match (tpe, target) with
-    | (Type.Int, Type.Int) | (Type.Float, Type.Float) | (Type.Bool, Type.Bool)
-    | (Type.Bool, Type.Int) | (Type.Int, Type.Bool) | (Type.String, Type.String) -> 
+    | (Type.Int, Type.Int) | (Type.Float, Type.Float) | (Type.Bool, Type.Bool) | (Type.Bool, Type.Int) | (Type.Int, 
+                                                                                                          Type.Bool) | (Type.String, 
+                                                                                                                        Type.String) -> 
         ir
     | (Type.Int, Type.Float) -> Conv(ir, Type.Float)
     | (Type.Float, Type.Int) -> Conv(ir, Type.Int)
